@@ -6,12 +6,15 @@ class BlackjackGame {
         this.deck = [];
         this.dealerHand = [];
         this.playerHand = [];
+        this.splitHand = null;  // For split hands
+        this.splitBet = 0;      // Bet for split hand
         this.bankroll = 1000;
         this.currentBet = 0;
         this.gameInProgress = false;
         this.dealerTurn = false;
         this.canDoubleDown = false;
         this.canSplit = false;
+        this.playingSplitHand = false;
 
         this.initializeElements();
         this.attachEventListeners();
@@ -23,8 +26,6 @@ class BlackjackGame {
         this.elements = {
             dealerHand: document.getElementById('dealer-hand'),
             playerHand: document.getElementById('player-hand'),
-            dealerScore: document.getElementById('dealer-score').querySelector('.score-value'),
-            playerScore: document.getElementById('player-score').querySelector('.score-value'),
             bankroll: document.getElementById('bankroll'),
             currentBet: document.getElementById('current-bet'),
             message: document.getElementById('message'),
@@ -248,7 +249,14 @@ class BlackjackGame {
 
         // Enable/disable buttons based on game state
         this.elements.doubleBtn.disabled = !this.canDoubleDown || this.currentBet > this.bankroll;
-        this.elements.splitBtn.style.display = this.canSplit ? 'inline-block' : 'none';
+
+        // Only show split button if can split AND has enough money
+        if (this.canSplit && this.currentBet <= this.bankroll) {
+            this.elements.splitBtn.style.display = 'inline-block';
+            this.elements.splitBtn.disabled = false;
+        } else {
+            this.elements.splitBtn.style.display = 'none';
+        }
     }
 
     checkSplitOption() {
@@ -274,21 +282,43 @@ class BlackjackGame {
         this.elements.splitBtn.style.display = 'none';
 
         const card = this.deck.pop();
-        this.playerHand.push(card);
+
+        if (this.playingSplitHand) {
+            this.splitHand.push(card);
+        } else {
+            this.playerHand.push(card);
+        }
+
         this.renderHands(false);
         this.updateDisplay();
 
-        const score = this.calculateScore(this.playerHand);
+        const currentHand = this.playingSplitHand ? this.splitHand : this.playerHand;
+        const score = this.calculateScore(currentHand);
+
         if (score > 21) {
-            this.showMessage('BUST! You lose.', 'lose');
-            this.endGame();
+            const handName = this.playingSplitHand ? 'Second hand' : (this.splitHand ? 'First hand' : 'Hand');
+            this.showMessage(`${handName} BUST!`, 'lose');
+
+            // If we were playing first hand and have a split hand, switch to second hand
+            if (!this.playingSplitHand && this.splitHand) {
+                setTimeout(() => this.switchToSplitHand(), 1500);
+            } else {
+                this.stand();
+            }
         } else if (score === 21) {
             // Automatically stand on 21
-            this.stand();
+            setTimeout(() => this.stand(), 500);
         }
     }
 
     stand() {
+        // If we have a split hand and haven't played it yet, switch to it
+        if (this.splitHand && !this.playingSplitHand) {
+            setTimeout(() => this.switchToSplitHand(), 1000);
+            return;
+        }
+
+        // All hands have been played, now dealer plays
         this.dealerTurn = true;
         this.elements.actionControls.style.display = 'none';
         this.renderHands(true); // Show dealer's hidden card
@@ -296,6 +326,15 @@ class BlackjackGame {
 
         // Dealer plays
         this.playDealerHand();
+    }
+
+    switchToSplitHand() {
+        this.playingSplitHand = true;
+        this.showMessage('Playing second hand...', 'push');
+        this.renderHands(false);
+        this.elements.actionControls.style.display = 'block';
+        this.elements.doubleBtn.disabled = true;
+        this.elements.splitBtn.style.display = 'none';
     }
 
     doubleDown() {
@@ -325,9 +364,36 @@ class BlackjackGame {
     }
 
     split() {
-        this.showMessage('Split functionality coming in a future update!', 'push');
-        // Note: Full split implementation would require managing two separate hands
-        // For now, we'll keep it simple and not implement split
+        // Check if player has enough money to match the bet
+        if (this.currentBet > this.bankroll) {
+            this.showMessage('Insufficient funds to split!', 'lose');
+            return;
+        }
+
+        // Deduct the additional bet for the split hand
+        this.bankroll -= this.currentBet;
+        this.splitBet = this.currentBet;
+        this.updateDisplay();
+
+        // Create the split hand with the second card
+        this.splitHand = [this.playerHand.pop()];
+
+        // Deal one card to each hand
+        const card1 = this.deck.pop();
+        const card2 = this.deck.pop();
+
+        this.playerHand.push(card1);
+        this.splitHand.push(card2);
+
+        this.showMessage('Playing first hand...', 'push');
+        this.renderHands(false);
+        this.updateDisplay();
+
+        // Can no longer split or double down after splitting
+        this.canSplit = false;
+        this.canDoubleDown = false;
+        this.elements.splitBtn.style.display = 'none';
+        this.elements.doubleBtn.disabled = true;
     }
 
     async playDealerHand() {
@@ -345,23 +411,78 @@ class BlackjackGame {
     }
 
     determineWinner() {
-        const playerScore = this.calculateScore(this.playerHand);
         const dealerScore = this.calculateScore(this.dealerHand);
+        let resultMessage = '';
+        let totalWinnings = 0;
 
-        if (dealerScore > 21) {
-            this.showMessage(`Dealer busts with ${dealerScore}! You win!`, 'win');
-            this.bankroll += this.currentBet * 2;
-        } else if (playerScore > dealerScore) {
-            this.showMessage(`You win! ${playerScore} vs ${dealerScore}`, 'win');
-            this.bankroll += this.currentBet * 2;
-        } else if (playerScore < dealerScore) {
-            this.showMessage(`You lose. ${playerScore} vs ${dealerScore}`, 'lose');
+        // Evaluate first hand
+        const hand1Score = this.calculateScore(this.playerHand);
+        const hand1Result = this.evaluateHand(hand1Score, dealerScore, this.currentBet);
+        totalWinnings += hand1Result.winnings;
+
+        if (this.splitHand) {
+            // Evaluate second hand
+            const hand2Score = this.calculateScore(this.splitHand);
+            const hand2Result = this.evaluateHand(hand2Score, dealerScore, this.splitBet);
+            totalWinnings += hand2Result.winnings;
+
+            // Build message for both hands
+            resultMessage = `Dealer: ${dealerScore}\n`;
+            resultMessage += `Hand 1 (${hand1Score}): ${hand1Result.message}\n`;
+            resultMessage += `Hand 2 (${hand2Score}): ${hand2Result.message}\n`;
+            resultMessage += `Total: `;
+
+            if (totalWinnings > this.currentBet + this.splitBet) {
+                resultMessage += `Win $${totalWinnings - (this.currentBet + this.splitBet)}`;
+                this.showMessage(resultMessage, 'win');
+            } else if (totalWinnings < this.currentBet + this.splitBet) {
+                resultMessage += `Lose $${(this.currentBet + this.splitBet) - totalWinnings}`;
+                this.showMessage(resultMessage, 'lose');
+            } else {
+                resultMessage += 'Push';
+                this.showMessage(resultMessage, 'push');
+            }
         } else {
-            this.showMessage(`Push! Both have ${playerScore}`, 'push');
-            this.bankroll += this.currentBet;
+            // Single hand result
+            if (dealerScore > 21) {
+                this.showMessage(`Dealer busts with ${dealerScore}! You win!`, 'win');
+            } else if (hand1Score > 21) {
+                this.showMessage(`You bust with ${hand1Score}. You lose.`, 'lose');
+            } else if (hand1Score > dealerScore) {
+                this.showMessage(`You win! ${hand1Score} vs ${dealerScore}`, 'win');
+            } else if (hand1Score < dealerScore) {
+                this.showMessage(`You lose. ${hand1Score} vs ${dealerScore}`, 'lose');
+            } else {
+                this.showMessage(`Push! Both have ${hand1Score}`, 'push');
+            }
         }
 
+        this.bankroll += totalWinnings;
         this.endGame();
+    }
+
+    evaluateHand(playerScore, dealerScore, bet) {
+        let winnings = 0;
+        let message = '';
+
+        if (playerScore > 21) {
+            message = 'Bust - Lose';
+            winnings = 0;
+        } else if (dealerScore > 21) {
+            message = 'Dealer Bust - Win';
+            winnings = bet * 2;
+        } else if (playerScore > dealerScore) {
+            message = 'Win';
+            winnings = bet * 2;
+        } else if (playerScore < dealerScore) {
+            message = 'Lose';
+            winnings = 0;
+        } else {
+            message = 'Push';
+            winnings = bet;
+        }
+
+        return { winnings, message };
     }
 
     calculateScore(hand) {
@@ -402,10 +523,71 @@ class BlackjackGame {
             }
         });
 
-        // Render player hand
-        this.playerHand.forEach(card => {
-            this.elements.playerHand.appendChild(this.createCard(card));
-        });
+        // Render player hand(s)
+        if (this.splitHand) {
+            // Show both hands with labels
+            const hand1Label = document.createElement('div');
+            hand1Label.className = 'hand-label';
+            hand1Label.textContent = this.playingSplitHand ? 'Hand 1 (played)' : 'Hand 1 (playing)';
+            hand1Label.style.cssText = 'width: 100%; text-align: center; font-weight: bold; margin-bottom: 10px; color: ' + (this.playingSplitHand ? '#888' : '#ffd700');
+            this.elements.playerHand.appendChild(hand1Label);
+
+            // Render first hand
+            const hand1Container = document.createElement('div');
+            hand1Container.style.cssText = 'display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; opacity: ' + (this.playingSplitHand ? '0.5' : '1');
+            this.playerHand.forEach(card => {
+                hand1Container.appendChild(this.createCard(card));
+            });
+            this.elements.playerHand.appendChild(hand1Container);
+
+            // Show score for first hand
+            const score1 = document.createElement('div');
+            score1.textContent = `Score: ${this.calculateScore(this.playerHand)}`;
+            score1.style.cssText = 'width: 100%; text-align: center; margin-bottom: 15px; color: ' + (this.playingSplitHand ? '#888' : '#fff');
+            this.elements.playerHand.appendChild(score1);
+
+            // Render second hand
+            const hand2Label = document.createElement('div');
+            hand2Label.className = 'hand-label';
+            hand2Label.textContent = this.playingSplitHand ? 'Hand 2 (playing)' : 'Hand 2';
+            hand2Label.style.cssText = 'width: 100%; text-align: center; font-weight: bold; margin-bottom: 10px; color: ' + (this.playingSplitHand ? '#ffd700' : '#888');
+            this.elements.playerHand.appendChild(hand2Label);
+
+            const hand2Container = document.createElement('div');
+            hand2Container.style.cssText = 'display: flex; gap: 10px; justify-content: center; opacity: ' + (this.playingSplitHand ? '1' : '0.5');
+            this.splitHand.forEach(card => {
+                hand2Container.appendChild(this.createCard(card));
+            });
+            this.elements.playerHand.appendChild(hand2Container);
+
+            // Show score for second hand
+            const score2 = document.createElement('div');
+            score2.textContent = `Score: ${this.calculateScore(this.splitHand)}`;
+            score2.style.cssText = 'width: 100%; text-align: center; color: ' + (this.playingSplitHand ? '#fff' : '#888');
+            this.elements.playerHand.appendChild(score2);
+        } else {
+            // Render single hand normally with score
+            const handContainer = document.createElement('div');
+            handContainer.style.cssText = 'display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;';
+            this.playerHand.forEach(card => {
+                handContainer.appendChild(this.createCard(card));
+            });
+            this.elements.playerHand.appendChild(handContainer);
+
+            // Show score
+            const scoreDiv = document.createElement('div');
+            scoreDiv.textContent = `Score: ${this.calculateScore(this.playerHand)}`;
+            scoreDiv.style.cssText = 'width: 100%; text-align: center; margin-top: 15px; font-size: 1.3em; color: #ffd700;';
+            this.elements.playerHand.appendChild(scoreDiv);
+        }
+
+        // Add dealer score if showing
+        if (showDealerCard && this.dealerHand.length > 0) {
+            const dealerScoreDiv = document.createElement('div');
+            dealerScoreDiv.textContent = `Score: ${this.calculateScore(this.dealerHand)}`;
+            dealerScoreDiv.style.cssText = 'width: 100%; text-align: center; margin-top: 15px; font-size: 1.3em; color: #ffd700;';
+            this.elements.dealerHand.appendChild(dealerScoreDiv);
+        }
     }
 
     createCard(card) {
@@ -442,23 +624,6 @@ class BlackjackGame {
         // Update bankroll and bet
         this.elements.bankroll.textContent = `$${this.bankroll}`;
         this.elements.currentBet.textContent = `$${this.currentBet}`;
-
-        // Update scores
-        if (this.playerHand.length > 0) {
-            this.elements.playerScore.textContent = this.calculateScore(this.playerHand);
-        } else {
-            this.elements.playerScore.textContent = '0';
-        }
-
-        if (this.dealerHand.length > 0 && this.dealerTurn) {
-            this.elements.dealerScore.textContent = this.calculateScore(this.dealerHand);
-        } else if (this.dealerHand.length > 0) {
-            // Only show first card value
-            const firstCardValue = this.dealerHand[0].value === 'A' ? 11 : this.dealerHand[0].numValue;
-            this.elements.dealerScore.textContent = firstCardValue;
-        } else {
-            this.elements.dealerScore.textContent = '0';
-        }
     }
 
     showMessage(text, type = '') {
@@ -494,8 +659,11 @@ class BlackjackGame {
         this.currentBet = 0;
         this.dealerHand = [];
         this.playerHand = [];
+        this.splitHand = null;
+        this.splitBet = 0;
         this.gameInProgress = false;
         this.dealerTurn = false;
+        this.playingSplitHand = false;
 
         this.elements.dealerHand.innerHTML = '';
         this.elements.playerHand.innerHTML = '';

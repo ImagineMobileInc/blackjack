@@ -88,6 +88,7 @@ header h1 {
 /* Hand Display */
 .hand {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     min-height: 140px;
