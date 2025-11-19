@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackjack - Classic Card Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>♠ BLACKJACK ♥</h1>
+            <div class="game-info">
+                <div class="bankroll">
+                    <span>Bankroll:</span>
+                    <span id="bankroll">$1000</span>
+                </div>
+                <div class="current-bet">
+                    <span>Current Bet:</span>
+                    <span id="current-bet">$0</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="game-area">
+            <!-- Dealer Section -->
+            <section class="dealer-section">
+                <h2>Dealer</h2>
+                <div class="hand" id="dealer-hand">
+                    <!-- Cards will be added here dynamically -->
+                </div>
+                <div class="score" id="dealer-score">
+                    <span class="score-label">Score:</span>
+                    <span class="score-value">0</span>
+                </div>
+            </section>
+
+            <!-- Player Section -->
+            <section class="player-section">
+                <h2>Player</h2>
+                <div class="hand" id="player-hand">
+                    <!-- Cards will be added here dynamically -->
+                </div>
+                <div class="score" id="player-score">
+                    <span class="score-label">Score:</span>
+                    <span class="score-value">0</span>
+                </div>
+            </section>
+
+            <!-- Message Display -->
+            <div class="message" id="message"></div>
+        </main>
+
+        <!-- Controls Section -->
+        <section class="controls">
+            <!-- Betting Controls -->
+            <div class="betting-controls" id="betting-controls">
+                <h3>Place Your Bet</h3>
+                <div class="bet-buttons">
+                    <button class="bet-btn" data-amount="10">$10</button>
+                    <button class="bet-btn" data-amount="25">$25</button>
+                    <button class="bet-btn" data-amount="50">$50</button>
+                    <button class="bet-btn" data-amount="100">$100</button>
+                    <button class="bet-btn" data-amount="custom">Custom</button>
+                </div>
+                <div class="custom-bet" id="custom-bet" style="display: none;">
+                    <input type="number" id="custom-bet-input" placeholder="Enter amount" min="1">
+                    <button id="confirm-custom-bet">Confirm</button>
+                </div>
+                <button class="action-btn deal-btn" id="deal-btn">Deal Cards</button>
+            </div>
+
+            <!-- Game Action Controls -->
+            <div class="action-controls" id="action-controls" style="display: none;">
+                <button class="action-btn" id="hit-btn">Hit</button>
+                <button class="action-btn" id="stand-btn">Stand</button>
+                <button class="action-btn" id="double-btn">Double Down</button>
+                <button class="action-btn" id="split-btn" style="display: none;">Split</button>
+            </div>
+
+            <!-- Insurance Controls -->
+            <div class="insurance-controls" id="insurance-controls" style="display: none;">
+                <p>Dealer showing Ace. Would you like insurance?</p>
+                <button class="action-btn" id="insurance-yes">Yes</button>
+                <button class="action-btn" id="insurance-no">No</button>
+            </div>
+
+            <!-- New Game Button -->
+            <button class="action-btn new-game-btn" id="new-game-btn" style="display: none;">New Game</button>
+        </section>
+
+        <!-- Game Rules -->
+        <section class="rules">
+            <details>
+                <summary>Game Rules</summary>
+                <div class="rules-content">
+                    <h4>How to Play:</h4>
+                    <ul>
+                        <li><strong>Goal:</strong> Get as close to 21 as possible without going over (busting)</li>
+                        <li><strong>Card Values:</strong> 2-10 = face value, J/Q/K = 10, Ace = 1 or 11</li>
+                        <li><strong>Blackjack:</strong> An Ace and a 10-value card on the first two cards (pays 3:2)</li>
+                        <li><strong>Hit:</strong> Take another card</li>
+                        <li><strong>Stand:</strong> Keep your current hand</li>
+                        <li><strong>Double Down:</strong> Double your bet and receive exactly one more card</li>
+                        <li><strong>Split:</strong> If you have two cards of the same value, split them into two hands</li>
+                        <li><strong>Insurance:</strong> When dealer shows an Ace, you can bet half your original bet that dealer has blackjack</li>
+                        <li><strong>Dealer Rules:</strong> Dealer must hit on 16 and below, stand on 17 and above</li>
+                    </ul>
+                </div>
+            </details>
+        </section>
+
+        <footer>
+            <p>Based on the classic BASIC game • Enhanced for the web</p>
+        </footer>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
